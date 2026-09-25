@@ -1,0 +1,540 @@
+ZERO -- ANALYTICAL DECISIONS
+Behaviour of the number zero in multiplication tests.
+Every decision below is applied in queries/ and analysis/. Update this file whenever one changes.
+
+--------------------------------------------------------------------------
+2026-09-18  Decisions #1-#12 (first figure: RT vs error rate per fact, by age)
+--------------------------------------------------------------------------
+
+#1  DATA SOURCE
+    A998 fluency test only:
+      bi_gold_prod.dm_research.fluency_test_statements  (one row per statement)
+      bi_gold_prod.dm_research.fluency_test_metrics     (joined on metric_id, gives course age)
+    The Fluency zone (dwh_digital_practice.f_elementary_fluency_attempts) is NOT used for now.
+    Reason: A998 is a controlled, timed test; the Fluency zone is self-paced and noisier.
+
+#2  ACADEMIC YEAR / COUNTRY
+    One academic_year_id per figure, never pooled. Built so far: ES_2025, ES_2024. Italy was built and then dropped (see #12).
+    The year is a marker in the .sql ("-- {YEAR}"): the notebook substitutes it and passes
+    sql_text= to cached_query(), so each year gets its own cache entry.
+    Note: ES_2024 is thin at age 15 (~3k responses, 84 of 100 facts survive the >=30 rule).
+
+#3  OPERATIONS INCLUDED
+    Multiplication only, matched with RLIKE '^[0-9][×·][0-9]$'.
+    A998 also contains division (e.g. '48:6'), which is excluded.
+    Facts are single-digit: 0-9 x 0-9, i.e. 100 possible facts.
+
+#4  GLYPH NORMALISATION
+    A998 renders multiplication two ways: '7×3' (ages 8-11) and '7·3' (ages 12-15, activity pack 39).
+    '·' is normalised to '×' and the two are pooled, so one fact is one point.
+    Reason: same 100 facts, different rendering by school stage. Keeping them apart would remove
+    secondary-school ages from the study entirely. (Same convention as the MULTIPLY repo.)
+
+#5  DIRECTIONALITY
+    Facts are DIRECTIONAL ordered pairs: 0×7 and 7×0 are two different points, never averaged.
+    Reason: order asymmetry is one of the things the zero question is about.
+
+#6  AGE GROUPING
+    Panels are split by m.classroom_course_age (the classroom's course age, not the student's own
+    age), restricted to 8-15. NULLs and ages 5-7 are dropped (<1k statements each, noise).
+    Panels are labelled with the age alone ("Age 8"), not with the school year.
+
+#7  FAST-WRONG FILTER (the 1.2 s rule)
+    A response is dropped when it is NOT Correct AND was answered in under 1.2 s.
+    It removes the individual RESPONSE, not the student: a student with one anticipation keeps
+    all their other responses.
+    Applied to both Incorrect and Help responses (everything counted as an error under #8).
+    Reason: sub-1.2 s wrong answers are anticipations or mis-taps, not retrieval attempts.
+
+#8  HELP STATEMENTS
+    statement_result = 'Help' COUNTS AS AN ERROR.
+    error_rate = (Incorrect + Help) / all kept responses.
+    Reason: asking for help is a failure to retrieve the fact. The query also returns n_help
+    separately, so the size of this choice can be checked at any time.
+
+#9  RESPONSE TIME
+    RT = statement_seconds_spent, MEDIAN over CORRECT responses only.
+    Reason: median is robust to the long right tail; wrong answers mix fast guesses with slow
+    struggles, so their RT is not comparable.
+
+#10 RT OUTLIERS
+    No upper cut-off. The median already absorbs the tail, so nothing is discarded.
+
+#11 MINIMUM SAMPLE
+    A fact x age cell is plotted only with >= 30 kept responses (HAVING count(*) >= 30).
+    In practice every surviving cell has far more (minimum observed: ~500).
+
+#12 KNOWN GAPS -- COVERAGE OF THE 0-FACTS
+    Age 8 (both countries, both years): the test administers neither the 0-facts nor the 1-facts.
+    72 of the 100 facts appear and none contains a 0. The panel is annotated in the figure.
+    Italy: dropped from the study. IT_2025 only reached ages 8-10 after the >=30 rule and IT_2024
+    only ages 8-9 with no 0-facts at all; across all years only 2.8% of Italian responses involve
+    a 0. None of this is a filtering artefact: those items are absent from the source data.
+    Country coverage is measured by queries/country_coverage.sql (first cell of the notebook):
+    ES 11.1M responses (11.9% with a 0), MX 1.39M (10.0%), IT 580k (2.8%), US 138k (3.1%),
+    EC-SI 128k, CO-B 84k, CL 35k, EC-CO 30k, BR 11k, CO-A 9k. Only ES, and possibly MX, carry
+    enough 0-fact data for this study.
+
+--------------------------------------------------------------------------
+2026-09-18  Decision #13 (country groups)
+--------------------------------------------------------------------------
+
+#13 COUNTRY GROUPS, ACADEMIC YEARS POOLED
+    A second view of the same figure, grouped by country instead of by year. The grouping is the
+    SMALLEST one that represents every country and still clears the >=30 rule on all 100 facts
+    (evidence: queries/fact_counts_by_country_age.sql, second cell of the notebook):
+      Spain           ES              ages 8-15
+      Mexico          MX              ages 8-13
+      Italy           IT              ages 8-10
+      United States   US              ages 8-10
+      Ecuador (SI)    EC-SI           ages 8-11
+      Ecuador (CO)    EC-CO           ages 8-11
+      Colombia        CO-A + CO-B     ages 8-11   -- CO-A alone clears 3-8 facts of 100
+      Chile + Brazil  CL + BR         ages 8-11   -- BR alone has ~650 responses per age past 8,
+                                                     so no fact of its own reaches 30; it is ~2%
+                                                     of this group and is represented, not compared
+    Ecuador's two sources stay apart because each clears the bar alone; same logic everywhere.
+    Spain is NOT pooled with Italy: Spain would be 95% of that pair, so the panel would be Spain
+    with extra noise rather than a European group.
+    Here academic years ARE pooled, which decision #2 forbids for the per-year figures. Outside
+    Spain no single year has the volume.
+    Query: queries/rt_error_by_fact_age_country.sql, country list as the -- {COUNTRIES} marker.
+    Note: pooling years raises age 8 in ES from 72 to 80 facts -- older years administered a few
+    items that ES_2025 does not. Still no 0-facts at age 8 anywhere.
+
+--------------------------------------------------------------------------
+2026-09-21  Decisions #14-#17 (second notebook: what the wrong answer is)
+--------------------------------------------------------------------------
+
+#14 ERROR TAXONOMY ON THE 0-FACTS
+    Every wrong answer to a fact containing a 0 falls in exactly one class, priority order:
+      "= n (additive)"  the answer equals a+b, i.e. the non-zero operand   (0x7 -> 7)
+      "= 1"             the answer is 1                                   (multiplicative identity)
+      "Other digit"     the answer is 2-9 and is not n
+      ">= 10"           the answer is 10 or more
+    Reason: on the 0-facts the answer space collapses to the single digits -- in ES_2025 exactly
+    one of 54,804 errors is a two-digit answer -- so the classic operand / table / non-table
+    taxonomy has nothing to separate. These classes are what the data actually contains.
+    "= n" is the additive error the study reports. "= 1" is kept apart because it grows with age
+    (3% of answered errors at age 9, 8-18% at 14-15, on a few hundred responses) and is a
+    different rule, not a mis-tap.
+    Answer column: fluency_test_statements.user_answer, parsed with try_cast. Leading zeros are
+    common ('098') and parse fine; a non-numeric click string occurs twice in the whole year and
+    is counted as no answer.
+
+#15 0x0 IS KEPT APART
+    0x0 is excluded from the 0-fact panels and from every reported %. Its correct answer is 0 and
+    a+b = 0 as well, so the additive error is undefined for it. It is reported on its own line of
+    the coverage table (error rate 0.7-4.2%, far below the other 0-facts).
+
+#16 HELP / NO ANSWER IN THE ERROR ANALYSIS
+    Help still counts as an error in the error RATE (#8 unchanged), but the histogram and the type
+    mix use ANSWERED errors only: a Help leaves no answer to classify. In ES_2025 that is 0.4% of
+    the 0-fact errors, so the choice moves nothing. Counted separately in the coverage table.
+
+#17 DENOMINATORS FOR THE REPORTED %
+    The headline number is the share of ALL RESPONSES to the fact that are answered "n"
+    (pct_of_all_responses): answering n is never correct on a 0-fact, so this is the share of the
+    whole response volume lost to this one mistake. Reported next to it, not instead of it, is the
+    share of the ANSWERED ERRORS that are "= n" (pct_of_answered_errors), which says what an error
+    looks like once one is made. Directions (0xn, nx0) are never pooled (#5).
+
+--------------------------------------------------------------------------
+2026-09-21  Decisions #18-#21 (third notebook: RT distribution by direction)
+--------------------------------------------------------------------------
+
+#18 POPULATION OF THE RT DISTRIBUTION
+    One row per RESPONSE (not per fact x age cell): every CORRECT answer to a fact containing a 0,
+    ES_2025, ages 8-15. Query: queries/rt_zero_facts_correct.sql.
+    The >= 30 rule (#11) counts ALL responses, so it cannot be applied to a correct-only pull:
+    the notebook takes the surviving (age, operation) cells from queries/rt_error_by_fact_age.sql
+    and keeps only responses in those cells. In ES_2025 this drops 31 of 474,989 responses and
+    removes age 8 entirely -- the test administers no 0-facts there (#12).
+    Only correct responses (#9): wrong answers mix fast guesses with slow struggles.
+
+#19 THE DIRECTION COMPARISON IS PAIRED WITHIN STUDENT
+    Responses are nested in students and the same student meets both directions in the same test,
+    so 0xn vs nx0 is tested paired, not as two independent samples: one median RT per student and
+    direction, then the Wilcoxon signed-rank test on the per-student difference nx0 - 0xn.
+    Rank-based, not parametric: the per-student differences are near-symmetric (skew -0.3) but extremely
+    heavy-tailed (excess kurtosis ~100, range -103 to +111 s), so a mean-based test is dominated by a
+    handful of students. The paired t test is reported alongside as a robustness check only; it agrees on
+    the direction (p = .002 pooled) but is far weaker than the rank test (p < .001), which is that tail
+    dominance. Effect size: matched-pairs rank-biserial correlation.
+    Seven ages are tested, so p values are also reported Holm-corrected family-wise; all seven survive.
+    Pooled over all 70,735 students: Mdn(nx0 - 0xn) = 34 ms, 95% CI [33, 42], 52.9% of students slower
+    on nx0, p < .001, r_rb = .058. CI of the median difference from the order statistics
+    (distribution-free), not bootstrapped -- it assumes nothing about the shape and is exact.
+    Students with only one of the two directions at a given age are dropped from the test
+    (70,735 student x age pairs survive out of 104,846 students).
+
+#20 VIOLIN AXIS IS A DISPLAY WINDOW, NOT A FILTER
+    The violins are drawn on a linear y-axis fixed by RT_LIM in the notebook (currently 0-4 s; 11.9% of
+    the correct responses are above it). Correct RT is strongly right-skewed (median ~2 s, maximum
+    ~110 s), so the full range flattens the body of the distribution into a line. The window is DISPLAY
+    only: the kernel, the quartile lines and every reported number use all responses, and #10 (no upper
+    cut-off) is unchanged. A log-axis variant showing the whole range, tail included, is saved next to
+    it as *_log.pdf/.png.
+    The KDE is drawn with gridsize=1000, not seaborn's default 100: the grid spans the whole data range
+    (0.6-110 s), so 100 points is one every 1.1 s and the body of the distribution (1-5 s) came out as a
+    straight-edged triangle. This is a rendering setting, not a filter.
+
+#21 0x0 IN THE RT FIGURE
+    0x0 is excluded from the two series, consistent with #15: it belongs to neither direction.
+    It is reported on its own line of the coverage table (it is the fastest of the 0-facts at
+    every age).
+
+--------------------------------------------------------------------------
+2026-09-21  Decisions #22-#25 (fourth notebook: order asymmetry, 0-facts vs every pair)
+--------------------------------------------------------------------------
+
+#22 THE COMPARISON IS GENERALISED TO ALL 45 PAIRS
+    The nx0 vs 0xn test (#19) is run on every pair of DIFFERENT operands, 45 in total (C(10,2)).
+    Squares (axa) are excluded: they have no second order. Query: queries/rt_by_fact_correct.sql,
+    a superset of queries/rt_zero_facts_correct.sql with the same population and filters.
+    Within a pair the operands are ordered small-first / large-first, so 2x3 is small-first and 3x2
+    large-first; the difference is always large-first minus small-first, which for a 0-fact is
+    nx0 - 0xn. The zero is the smallest operand, so the 0-facts keep the sign convention of #19.
+
+#23 AGES POOLED WITHIN A PAIR, HOLM OVER THE 45 PAIRS
+    The per-pair test pools ages: the pairing is within student and a student sits in one course, so
+    each student contributes one difference per pair. 45 pairs are one family -> Holm correction.
+    Difficulty of a pair is its ERROR RATE over all responses (from queries/rt_error_by_fact_age.sql),
+    not its RT: using RT to rank difficulty and then explaining an RT effect with it would be circular.
+
+#24 THE ORDER ASYMMETRY IS A RULE EFFECT, NOT A ZERO EFFECT AND NOT A DIFFICULTY EFFECT
+    (Rewritten 2026-09-21. The first version of this decision concluded "easy-fact effect". That was
+    wrong: the comparison group for the 0-facts was dominated by the 1-facts, which are not ordinary
+    easy facts -- n×1 = n is a RULE exactly as n×0 = 0 is. Corrected grouping below.)
+
+    Three groups of pairs: rule-0 (the 9 pairs with a zero), rule-1 (the 8 pairs 1x2..1x9), and
+    retrieval (the 28 pairs of operands 2-9, which have to be recalled from the table).
+    Result, ES_2025, large-first minus small-first:
+      rule-0      9 pairs  r_rb Mdn +.051  +41 ms  large-first slower in  9/9   error Mdn 10.4%
+      rule-1      8 pairs  r_rb Mdn +.071  +42 ms  large-first slower in  7/8   error Mdn  6.0%
+      retrieval  28 pairs  r_rb Mdn -.029  -51 ms  large-first slower in  9/28  error Mdn 25.1%
+    Kruskal-Wallis over the three groups H = 20.8, p < .001. The two rule tables are indistinguishable
+    from each other (U = 25, p = .321); rule against retrieval U = 433, p < .001.
+
+    Difficulty does NOT explain it, though it looked like it did before the 1-facts were separated:
+      - rho(asymmetry, error rate) = -.61 over all 45 pairs but +.03 (p = .87) within the 28 retrieval
+        pairs. The apparent trend was the rule facts being both easy and asymmetric.
+      - The Theil-Sen trend fitted on the retrieval pairs alone is flat (slope +.0006). Rule facts sit
+        above it: residual Mdn +.098 vs -.001, p < .001.
+      - Against the 9 retrieval pairs that are equally easy (< 20% errors: 2x3..2x9, 3x4, 3x5, 3x7) the
+        rule facts are still different, p = .002; those easy retrieval pairs show no asymmetry at all
+        (r_rb Mdn -.011, large-first slower in only 3 of 9).
+
+    Reading: when the fact is solved by applying a rule, meeting the rule operand FIRST (0xn, 1xn) is
+    faster than meeting it second (nx0, nx1) -- the rule can fire as soon as the first operand is read.
+    When the fact has to be retrieved, there is no such trigger and the order effect is not systematic.
+    The 0 is one of two rule tables and behaves like the other, so the paper's claim is about rule
+    application, not about the zero on its own. The 1-facts are the natural control group and belong
+    in the study.
+
+#25 WHAT IS NOT CONTROLLED YET
+    Presentation order inside the test (whether one order tends to be administered earlier in the
+    session, which would carry a warm-up effect) is not modelled. Nor is the activity pack.
+
+--------------------------------------------------------------------------
+2026-09-21  Decisions #26-#27 (replication in ES_2024)
+--------------------------------------------------------------------------
+
+#26 THE PAIR ANALYSIS RUNS ON TWO YEARS, INDEPENDENTLY
+    rt_direction_by_pair.ipynb runs the whole analysis once per academic year (ES_2025, ES_2024),
+    never pooled (#2). ES_2024: 2.25M correct responses, 156k students, all 45 pairs clear the >= 30
+    rule, smallest pair 2,954 students.
+    The "equally easy retrieval pairs" control is ranked WITHIN the year (the 17 easiest retrieval
+    pairs, matching the 17 rule pairs in count). A fixed threshold does not transfer: ES_2024 is
+    harder overall and has NO retrieval pair under 20% errors, which silently emptied the control.
+    Note this control is weak in both years -- no retrieval pair is as easy as a rule fact
+    (rule error Mdn ~10%, the 17 easiest retrieval pairs ~19% in 2025, ~30% in 2024). The Theil-Sen
+    residual control is the one that carries the argument.
+
+#27 WHAT REPLICATES AND WHAT DOES NOT
+    ROBUST across both years:
+      - The 0-fact asymmetry: large-first (nx0) slower in 9 of 9 pairs both years,
+        Mdn +41 ms (2025) / +49 ms (2024), r_rb .035-.075 / .036-.084.
+      - The 1-table behaves like the 0-table: 0 vs 1 not different (p = .321 / .200), 7 of 8 pairs
+        positive both years -- and the SAME two exceptions both years: 1x2 negative (-.064 / -.042)
+        and 1x3 flat (+.001 / +.017). Both are the smallest operands.
+      - Rule facts sit above the retrieval difficulty trend: residual Mdn +.098 / +.092,
+        p < .001 in both years.
+      - No difficulty gradient inside the retrieval pairs: rho +.03 (p = .87) / +.06 (p = .75).
+      - Magnitudes: rule benefit +1558/+1782 ms (0) and +1457/+1569 ms (1), r_rb .80-.84;
+        order effect 33-43 ms, 2.1-2.7% of the benefit, r_rb .042-.075.
+      - Per-pair effect sizes correlate across years: Spearman rho = +.69 (45 pairs); all 17 rule
+        pairs keep their sign, 36 of 45 pairs overall.
+      - Strongly negative pairs replicate: 3x5, 3x6, 4x5, 4x6, 3x7, 2x5 (large-first FASTER).
+      - 2x3 and 2x4 are positive and Holm-significant in both years: retrieval pairs that behave
+        like rule facts. Small operands again.
+
+    NOT ROBUST:
+      - The uncontrolled rule-vs-retrieval contrast weakens: p < .001 (2025) -> p = .030 (2024),
+        and the three-group Kruskal falls to p = .051. The reason is a year-level SHIFT of the
+        retrieval group toward positive (median r_rb -.029 -> -.001; e.g. 5x6 +.002 -> +.097,
+        5x8 +.001 -> +.067, 2x6 -.011 -> +.067). The rule groups do not move.
+      - The overall difficulty gradient over all 45 pairs: rho -.61 -> -.30.
+      - 6x8, the retrieval outlier of 2025 (+117 ms), does not replicate (+82 ms, Holm p = 1.00).
+      - Only 13 of 45 pairs are Holm-significant AND same-signed in both years.
+
+    Reading: the RULE effect replicates, the DIFFICULTY story does not and was never the mechanism.
+    The year-level shift of the retrieval group is the strongest argument yet for #25: whatever moves
+    between years (item presentation order within the session, activity packs) touches the retrieval
+    facts and leaves the rule facts alone. That must be modelled before the paper claims a mechanism.
+
+--------------------------------------------------------------------------
+OPEN / PENDING
+--------------------------------------------------------------------------
+-  Figure palette: viridis accent + grey is a placeholder, defined in plot_style.py. The paper's
+   palette (possibly a journal palette via ggsci) is still to be chosen -- change it there.
+-  Additional academic years (ES_2022-ES_2024, and other countries) not yet pooled.
+-  Activity pack differences within an age (packs 14/16/20 at age 8-9) are not modelled.
+-  The "= 1" class grows with age on the 0xn direction (18% of answered errors at age 14) on a few
+   hundred responses. Not yet checked against ES_2024 or against the 1-facts.
+-  Non-zero facts are answered 0 in ~2.5% of their errors (the mirror-image intrusion). Not analysed.
+-  nx0 is slower than 0xn at every age (median of the within-student difference 25-59 ms,
+   95% CI above 0 everywhere), but the effect is small (r_rb .02-.12) and it GROWS with age
+   while overall RT falls. ANSWERED for the non-zero facts: it is a
+   rule-application effect, shared with the 1-table and absent from the retrieval facts -- see #24.
+-  The RT distribution has a second small bump around 10-12 s in both directions and at every
+   age. Probably an item time-out or a give-up point in the A998 interface; not yet identified.
+-  1x2 goes the other way and 1x3 is flat, in BOTH years (#27). Both are the smallest operands, where
+   a retrieval route may be as fast as the rule. Not analysed. 2x3 and 2x4 go the rule way in both
+   years, which points the same direction: the boundary of "rule" is not exactly {0, 1}.
+-  6x8 (+117 ms in ES_2025) did not replicate. Treat it as noise.
+-  The ES_2024 replication shares 95,275 students with ES_2025 (see the sample section at the end).
+   Re-run the replication on the students present in only one of the two years before calling it
+   independent.
+-  The retrieval group shifts between years while the rule groups do not (#27). Unexplained, and it is
+   the reason the uncontrolled rule-vs-retrieval contrast is weaker in ES_2024.
+-  The error analysis (error_types.ipynb) should get the same rule-0 / rule-1 / retrieval split: if the
+   additive error "0xn = n" has a counterpart on the 1-table ("1xn = n+1"), that is the same story in
+   accuracy.
+
+--------------------------------------------------------------------------
+2026-09-21  Decision #28 (sample size on every figure)
+--------------------------------------------------------------------------
+
+#28 EVERY FIGURE CARRIES ITS SAMPLE SIZE
+    The violin figure: correct responses per age under panel A, students per age under panel B.
+    The per-pair forest: students per pair next to each pair label. The effect-size scatter: the pair
+    count and the range of students per pair, in the corner. The replication scatter: students and
+    responses per academic year. The unit differs per panel by design (responses for a distribution,
+    students for a paired test), so each axis label names which one it is.
+
+--------------------------------------------------------------------------
+2026-09-21  Sample of the study (counted, not a decision)
+--------------------------------------------------------------------------
+
+DISTINCT STUDENTS, A998 multiplication, ages 8-15, after the 1.2 s rule (#7)
+    ES_2025  171,848 students (170,765 with >= 1 correct response; 113,379 answered a 0-fact)
+    ES_2024  158,737          (156,829; 94,709)
+    ES_2023   94,311
+    ES_2022  104,020
+    The two years the study uses together: 235,310 DISTINCT students -- 140,035 in one year only and
+    95,275 in BOTH. The notebooks report slightly lower counts (170,281 / 155,838) because they keep
+    only correct responses to pairs with a != b that clear the >= 30 rule.
+
+    CONSEQUENCE FOR #27: ES_2024 is not an independent sample. 95,275 students (55% of ES_2025, 60%
+    of ES_2024) contribute to both years, in different course ages. Each year's paired test is valid
+    on its own, but "replicated in a second year" overstates the independence. A disjoint check --
+    ES_2024 restricted to the 63,462 students absent from ES_2025 -- has not been run yet.
+
+--------------------------------------------------------------------------
+2026-09-21  Decisions #29-#33 (fourth notebook: is the order effect real at the student level)
+--------------------------------------------------------------------------
+
+#29 WHAT THE DESIGN CAN AND CANNOT SUPPORT
+    A998 is a fluency test: the median student contributes 3 correct trials per condition (75th pct 3,
+    max 15; 45,615 of 59,175 students have at least one in both). No analysis can recover a reliable
+    INDIVIDUAL order effect from that. What the data can establish is whether the effect is a
+    population-level WITHIN-STUDENT shift that does not depend on who the student is. Every claim in
+    rt_order_robustness.ipynb is written at that level.
+
+#30 TRIAL-LEVEL INFERENCE: FIXED EFFECTS, CLUSTERED BY STUDENT
+    Trials are nested in students and facts and are never treated as independent.
+    Primary model: log(RT) ~ nx0, student and fact (the non-zero operand) absorbed as fixed effects,
+    standard errors clustered by student (pyfixest). Log because RT is right-skewed and a log effect is
+    a PROPORTIONAL one, which also answers "do slower students just show bigger millisecond gaps".
+    Effects are converted back to ms at the observed 0xn median (2.033 s in ES_2025).
+    Secondary: a mixed model with random intercept AND random slope of order by student, fitted on a
+    random subsample of 20,000 students (the full 59k does not fit in the machine's memory).
+    Query: queries/rt_zero_facts_trials.sql (correct AND incorrect responses, so accuracy shares it).
+
+#31 THE STUDENT CONTROLS ARE MEASURED OUTSIDE THE ZERO PROBLEMS
+    student_level = accuracy over all kept responses to facts with NO zero operand.
+    student_speed = mean log RT over the correct ones (HIGHER = SLOWER).
+    Both standardised within age, so they carry no age information; both require >= 20 non-zero trials,
+    which is what reduces 112,409 students to 59,175. Query: queries/student_controls.sql, which also
+    returns the same measures on the non-rule facts only (operands 2-9), since 1-facts are rule facts
+    too (#24) and arguably do not belong in a general-proficiency baseline. The primary controls use
+    the "no zero operand" version, as specified.
+
+#32 RESULT: THE EFFECT IS A WITHIN-STUDENT SHIFT, INDEPENDENT OF WHO THE STUDENT IS
+    Six estimators with different assumptions, all in ms at the 0xn median:
+      trial FE, student + fact          +39.9 [32.7, 47.1]   t = 11.0, p < .001 (+1.96% in log)
+      trial FE, all 112k students       +38.2 [31.8, 44.6]   (no control merge -> no selection)
+      mixed model, random slope         +32.2 [20.8, 43.6]
+      student delta, median             +34.0 [33.0, 42.0]   45,615 students, 53.4% above zero
+      matched student x operand         +34.0 [29.0, 43.0]   27,375 students, same fact both orders
+      one trial each, 200 resamples     +34.0 [33.0, 48.0]   -> not driven by heavy users
+    By age the trial FE estimate is 36.6 to 55.1 ms, every CI above zero, ages 9-15.
+    NO moderation: order x age p = .199, order x level p = .252, order x speed p = .440. The same three
+    regressions on the per-student delta are all null. The random slope VARIANCE is ~0 (SD .007 log
+    against a fixed effect of .016), i.e. no detectable between-student variability in the effect --
+    though with 3 trials per condition that test has little power, so read it as "no evidence of
+    heterogeneity", not as "the effect is identical in every student".
+    Mean-based statistics are much weaker than rank/median ones (t = 3.7 vs Wilcoxon p < 1e-40 on the
+    student deltas) -- the heavy tails of #19 again. The median is the estimate to quote.
+
+#33 ACCURACY GOES THE SAME WAY -- NO SPEED-ACCURACY TRADE-OFF
+    nx0 is not only slower but also less accurate: 89.86% vs 92.22% raw, -2.4 percentage points within
+    student and fact (t = -26.4, p < .001), odds ratio 0.73 [0.72, 0.75].
+    Unlike the RT effect, the accuracy gap DOES grow with age (order x age -0.31 points per year,
+    p < .001): -0.8 points at age 9, -3.5 at age 12, -1.4 at 15. It does not depend on proficiency
+    (p = .790) or speed (p = .183).
+    So the order effect is a plain disadvantage for nx0 on both outcomes, which is what a rule-first
+    account predicts and a speed-accuracy trade-off does not.
+
+--------------------------------------------------------------------------
+2026-09-21  Decisions #34-#41 (fifth notebook: within-student sequential consistency)
+--------------------------------------------------------------------------
+
+#34 HOW TRIAL ORDER AND DISTANCE ARE MEASURED
+    fluency_test_statements stores statement_idx (position inside the metric) but only ONE
+    response_at per METRIC -- every statement of a test carries the test's timestamp, checked:
+    399,581 metrics, 399,581 distinct (metric, timestamp) pairs. So elapsed time inside a test is
+    not recorded and three measures are emitted instead (queries/sequential_trials.sql):
+      pos_all      position among ALL of the student's statements, ordered by
+                   (response_at, metric_id, statement_idx). Divisions and trials dropped by the
+                   1.2 s rule are counted: they consumed test time even though they are not
+                   analysed. trials_between = difference - 1.
+      cum_seconds  sum of statement_seconds_spent inside the metric up to that statement. For two
+                   trials of the SAME test their difference is the elapsed answering time between
+                   them (median 21 s, p90 59 s). Undefined across tests.
+      metric_seq   which test of that student this is, so same-test and across-test pairs separate.
+    Across tests the distance is the difference of response_at in days (median 102, max 199).
+
+#35 THE UNIT OF ANALYSIS IS THE STUDENT, SEs CLUSTERED BY CLASSROOM
+    The primary analysis uses each student's chronologically FIRST TWO kept ×0 trials at a given
+    course age, one pair per student. Reason: a student with 14 trials would otherwise dominate a
+    student with 2, and the number of trials is itself a function of how much of the test they did.
+    Because the row is a student and no longer a trial, the trial-level clustering of the other
+    notebooks does not apply; SEs are clustered by CLASSROOM, since students sit the same test in
+    the same room on the same day (9,230 classrooms, no student in more than one --
+    queries/student_classroom.sql). Ages are never pooled inside a pair: both trials are at the
+    same classroom_course_age.
+    Trial 1 and Trial 2 are the first two trials that SURVIVE the filters (#7, #11), re-ranked in
+    the notebook after filtering, not the first two raw trials. Trials dropped by the filters still
+    count toward trials_between (#34).
+
+#36 PROBLEM TYPES: ×0, ×1 AND RETRIEVAL
+    Following #24, "ordinary multiplication" for the control analysis is RETRIEVAL (both operands
+    2-9) and the 1-table is a third group, not part of the control: n×1 = n is a rule exactly as
+    n×0 = 0, and pooling it into the baseline is the error #24 had to correct.
+      zero       exactly one operand is 0      499,834 kept trials, 112,409 students
+      one        no zero, at least one 1       668,684 trials, 159,134 students
+      retrieval  both operands 2-9           2,046,472 trials (capped, #37), 171,502 students
+    0×0 is excluded (#15) and 1×1 is excluded for the same reason (it belongs to neither order and
+    its own rule is degenerate): 28,064 and 27,982 trials.
+    0×1 and 1×0 belong to BOTH rule families. They are counted as ×0, because the zero rule is what
+    determines the answer. Consequence: the ×0 family contains two facts that are also 1-facts and
+    the ×1 family contains none that are 0-facts. Not yet checked as a robustness variant.
+
+#37 THE FIRST 14 TRIALS OF A TYPE PER STUDENT
+    queries/sequential_trials.sql returns only a student's first 14 kept trials of each type at each
+    age (marker -- {CAP}). 14 is the 99th percentile of the ×0 count per student (median 4); the cap
+    therefore removes 0.4% of ×0 trials and 41% of retrieval trials, whose median is 18 and maximum
+    122. Without it the problem-type comparison of #36 would partly be a comparison of sequence
+    lengths, and the pull would be 5.4M rows instead of 3.2M.
+
+#38 ASSOCIATION MEASURES (binary_stats.py)
+    Per probability: Wilson score interval. Difference of two probabilities: Newcombe hybrid-score
+    interval -- a Wald interval on a difference of ~93% vs ~52% misbehaves. Odds ratio with the
+    Woolf log interval.
+    The headline measure for comparing PROBLEM TYPES is the TETRACHORIC correlation, with a
+    percentile bootstrap over students. Reason: the odds ratio is not comparable across tables with
+    different marginals, and the three types differ a lot in base accuracy (×1 94.6%, ×0 93.3%,
+    retrieval 83.5%), so an OR comparison would partly be a comparison of base rates. The
+    tetrachoric assumes a latent bivariate normal and is invariant to where the thresholds fall.
+
+#39 A998 GIVES NO FEEDBACK AFTER A WRONG ANSWER
+    Confirmed with the product team: no correction, no correct answer shown, no retry prompt, no
+    rule reminder. Trial 1 correctness therefore does NOT come with a difference in instruction
+    received, which removes the usual confound of a sequential design.
+    The data agree that there is no implicit adaptive response either: after an error the next ×0
+    item is the same directed fact 1.38% of the time against 1.18% after a correct answer, at the
+    same median distance (6 items). A directed fact does repeat inside a test in ~3% of
+    (metric, fact) cases, but not as a response to failing it.
+
+#40 NO STUDENT FIXED EFFECT, AND NO RANDOM INTERCEPT, ON A LAGGED OUTCOME
+    The predictor is a lagged value of the outcome. With a handful of trials per student a student
+    fixed effect is estimated from those same outcomes and the within estimator is biased downward
+    by roughly -1/(T-1) (Nickell). Fitted here it returns -4.9 pp, i.e. the sign flips: that is the
+    bias, not a result. It is kept in the notebook, labelled, so nobody fits it again.
+    A student random intercept is the milder version of the same problem -- it partials out exactly
+    the between-student stability the association consists of, and the initial-conditions problem
+    contaminates it. It is also not estimable at this scale with what is installed: a variational
+    BinomialBayesMixedGLM over 55k student intercepts does not settle (its OR moved between 6.7 and
+    10.4 across subsamples) and variational posterior SDs are understated by construction. The
+    all-transitions model reported is a population-averaged GEE with an exchangeable working
+    correlation within student.
+    CONSEQUENCE FOR THE PAPER: this design cannot separate stable between-student differences from
+    genuine trial-to-trial carry-over (the heterogeneity vs state-dependence problem). What it CAN
+    support is the comparisons -- across problem types, across transfer conditions, across temporal
+    distance -- where the same structure sits on both sides.
+
+#41 WHAT THE SEQUENTIAL ANALYSIS FOUND (ES_2025, 93,663 students, one pair each)
+    RAW:        P(C2|C1) = 93.3%, P(C2|E1) = 51.5%, difference +41.8 pp [40.9, 42.7], OR 13.1.
+    ADJUSTED:   OR 10.7 [10.0, 11.4] with age, proficiency, speed, Trial-1 RT, Trial-2 order and
+                operand, and distance held; predicted 93.8% vs 61.3%, +32.5 pp. Holds inside every
+                within-age proficiency quintile (adjusted OR 8.1 to 13.3) and speed quintile.
+    AGE:        no change. Trial1 × age OR 1.006 [0.96, 1.05], p = .80, although the age-specific
+                ORs range 7.3-17.7. Those per-age numbers are not a developmental trend.
+    TRANSFER:   changing the non-zero operand does NOT weaken the association (interaction OR 0.78
+                [0.61, 1.01], p = .058, i.e. if anything weaker when the operand REPEATS).
+                Switching the order weakens it moderately (OR 15.6 same order vs 11.2 switched,
+                interaction 1.36 [1.20, 1.55], p < .001).
+                Both changed at once (0×7 -> 4×0, 43,511 students): raw OR 11.2, adjusted 9.0
+                [8.2, 9.9], +30.2 pp. The WEAKEST cell is the same fact repeated in the same order
+                (raw OR 4.6, adjusted 2.5, 1,136 students). The association is not fact repetition.
+    TYPE:       tetrachoric r on the 81,390 students who contribute a pair of all three types:
+                ×0 .70, ×1 .42, retrieval .41. Pooled adjusted interaction ×0 vs retrieval
+                OR 0.225 [0.21, 0.24], p < .001. The sequential dependence is specific to the zero
+                rule, and the 1-table does NOT behave like it here -- unlike in the RT asymmetry
+                (#24), where the two rule tables were indistinguishable.
+    STABILITY:  split-half (odd vs even trials, no lag anywhere): Spearman-Brown .77 for ×0 and .77
+                for retrieval, .65 for ×1. So a student's ×0 accuracy is no more stable as a RATE
+                than their retrieval accuracy; what differs is that individual ×0 trials are far
+                more tightly coupled to each other. Retrieval is a stable rate with noisy trials
+                (which item you know varies); ×0 is closer to all-or-nothing per student.
+    DISTANCE:   tetrachoric .78 within 2 items, .40 beyond 50; same test .78, a later test .43.
+                Across-test pairs are a median 102 days apart and still show +22.1 pp, OR 4.1.
+                Inside those pairs the gap in days adds nothing (p = .17). There is a short-lag
+                component on top of one that survives months and a different session.
+    RT:         among students who get Trial 2 right, having had Trial 1 right predicts -353 ms
+                [-387, -318], -13.7% on a 2.58 s baseline, unchanged with Trial-1 RT held.
+    TRANSITIONS: C->C 80.0%, E->C 7.3%, E->E 6.9%, C->E 5.8%.
+    READING:    evidence consistent with a stable and generalisable representation of the zero rule.
+                NOT evidence that Trial 1 caused Trial 2 (#40).
+
+--------------------------------------------------------------------------
+OPEN / PENDING (sequential analysis)
+--------------------------------------------------------------------------
+-  41% of the students in the descriptive sample have no proficiency control: student_controls.sql (#31)
+   requires >= 20 non-zero trials and 55,033 of 93,663 clear it. They are the students with the
+   shortest tests, and the raw contrast is slightly larger in the subset that survives (94.1% vs
+   55.0% against 93.3% vs 51.5%). Lowering the threshold, or a control estimated with shrinkage,
+   has not been tried.
+-  Not replicated in ES_2024. The whole notebook is parameterised by -- {YEAR} and should run as is.
+-  The short-lag component (tetrachoric .78 within 2 items vs .43 across tests) is not decomposed.
+   Attention, warm-up and task state all live in there and none of them is measured.
+-  Condition A -- the same directed fact repeated in the same order -- is the WEAKEST cell of the
+   four, which is the opposite of what fact repetition predicts. Only 1,136 students. Worth checking
+   whether those repeats are concentrated in a particular activity pack or position in the test.
+-  0×1 and 1×0 are counted as ×0 (#36). The ×0 vs ×1 contrast has not been re-run with them excluded.
+-  The ×1 table does NOT behave like the ×0 table here (tetrachoric .42 vs .70) while it did in the
+   RT asymmetry (#24). Either the rule-application effect (RT) and rule knowledge (accuracy) come
+   apart, or the 1-table is near ceiling (94.6% correct, only 3,978 first-trial errors among the
+   matched students) and the accuracy comparison has little room. Not resolved.
