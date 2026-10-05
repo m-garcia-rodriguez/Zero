@@ -23,6 +23,7 @@ Zero/
     ├── rt_direction_by_pair.ipynb
     ├── rt_order_robustness.ipynb
     ├── sequential_zero_consistency.ipynb
+    ├── zero_vs_one.ipynb
     └── plots/                # figures generades (PDF + PNG)
 ```
 
@@ -131,3 +132,15 @@ Canviar la query genera un cache nou automàticament; `refresh=True` força torn
   Queries: `queries/sequential_trials.sql` (cada assaig amb la seva posició dins la seqüència de
   l'alumne; marcadors `-- {YEAR}` i `-- {CAP}`), `queries/student_controls.sql` i
   `queries/student_classroom.sql`.
+
+- **`analysis/zero_vs_one.ipynb`** — totes les inspeccions principals del 0 repetides amb els **fets amb 1**
+  com a grup propi (revisió d'octubre de 2026): si un patró apareix amb el 0 i no amb l'1, no s'explica només
+  per l'ús d'una regla. Seccions: dispersió RT–error amb tres colors (ES_2025, ES_2024), separació per
+  **onada de recollida** (T1/T2/T3), tipus d'error (`0×n = n` contra `1×n = 1`), violí per ordre de `1×n` /
+  `n×1`, model de trials amb efectes fixos amb 0 i 1 junts, consistència seqüencial per edat, i les
+  comprovacions de dades (signes, `Help`, respostes mal registrades).
+  Resultat: els fets amb 0 són tan ràpids com els d'1 però el **doble d'errors**; l'error "copiar l'altre
+  operand" és 6 vegades més freqüent amb el 0; l'asimetria d'ordre en precisió és **només del 0** i en RT
+  només ho és a partir dels 12 anys; la consistència seqüencial també és específica del 0. Decisions #42-#49.
+  Queries noves: `rt_one_facts_trials.sql`, `rt_error_by_fact_age_wave.sql`, `check_operation_glyphs.sql`,
+  `check_user_answer_quality.sql`. Font: `zero_vs_one.py` (cel·les `# %%`).

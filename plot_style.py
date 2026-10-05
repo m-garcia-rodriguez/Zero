@@ -39,3 +39,8 @@ def paint_it_black(axes) -> None:
         for lab in ax.get_xticklabels() + ax.get_yticklabels():
             lab.set_color("black")
         ax.xaxis.label.set_color("black"); ax.yaxis.label.set_color("black")
+
+# 1-facts, the second rule table (analysis/zero_vs_one.ipynb, DECISIONS #42). Sits between the 0-colour and
+# grey on the same viridis ramp, so 0 / 1 / other read as three distinct, ordered groups.
+C_ONE = plt.cm.viridis(0.72)
+C_DIR_ONE = [plt.cm.viridis(0.55), plt.cm.viridis(0.85)]                           # 1×n vs n×1

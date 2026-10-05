@@ -308,7 +308,7 @@ OPEN / PENDING
    independent.
 -  The retrieval group shifts between years while the rule groups do not (#27). Unexplained, and it is
    the reason the uncontrolled rule-vs-retrieval contrast is weaker in ES_2024.
--  The error analysis (error_types.ipynb) should get the same rule-0 / rule-1 / retrieval split: if the
+-  DONE 2026-10-05 (#44): the error analysis (error_types.ipynb) should get the same rule-0 / rule-1 / retrieval split: if the
    additive error "0xn = n" has a counterpart on the 1-table ("1xn = n+1"), that is the same story in
    accuracy.
 
@@ -533,8 +533,96 @@ OPEN / PENDING (sequential analysis)
 -  Condition A -- the same directed fact repeated in the same order -- is the WEAKEST cell of the
    four, which is the opposite of what fact repetition predicts. Only 1,136 students. Worth checking
    whether those repeats are concentrated in a particular activity pack or position in the test.
--  0×1 and 1×0 are counted as ×0 (#36). The ×0 vs ×1 contrast has not been re-run with them excluded.
+-  0×1 and 1×0 are counted as ×0 (#36). DONE 2026-10-05: excluding them changes nothing (#49).
 -  The ×1 table does NOT behave like the ×0 table here (tetrachoric .42 vs .70) while it did in the
    RT asymmetry (#24). Either the rule-application effect (RT) and rule knowledge (accuracy) come
    apart, or the 1-table is near ceiling (94.6% correct, only 3,978 first-trial errors among the
    matched students) and the accuracy comparison has little room. Not resolved.
+
+--------------------------------------------------------------------------
+2026-10-05  Decisions #42-#47 (sixth notebook: zero vs one, after the October review)
+--------------------------------------------------------------------------
+Context: the reviewers asked to add the 1-facts to every major inspection, so that a pattern present for
+0 and absent for 1 can be argued to be zero-specific rather than a consequence of rule use.
+Notebook: analysis/zero_vs_one.ipynb (source kept as analysis/zero_vs_one.py, "# %%" cells).
+
+#42 THREE GROUPS IN EVERY FIGURE, AND A CORRECTION TO #12
+    0-facts: at least one operand 0 (0x1 and 1x0 included, as in #36). 1-facts: no 0, at least one 1.
+    Retrieval: both operands 2-9. Colours C_ZERO / C_ONE / grey, C_ONE and C_DIR_ONE added to plot_style.py.
+    CORRECTION to #12: at age 8 the 1xn direction IS administered (1x2..1x9, both years); n×1 and every
+    0-fact are not. #12 said "neither the 0-facts nor the 1-facts". Every 0 vs 1 comparison uses ages 9-15.
+
+#43 RESULT -- ACCURACY AND SPEED OF THE TWO RULE TABLES (rt_error_scatter_zero_one_by_age_*.png,
+    group_medians_zero_one_by_age.png)
+    The 0-facts are as fast as or FASTER than the 1-facts at every age (fact-median RT 2.06 vs 2.22 s,
+    ES_2025 ages 9-15) but about TWICE as error-prone (10.4% vs 4.7% of responses; ES_2024 14.6% vs 7.3%).
+    Facts-level Mann-Whitney 0 vs 1 is Holm-significant on error rate at every age 9-15 in ES_2025 and 9-14
+    in ES_2024. In the scatter the 1-facts sit on the low-RT end of the retrieval speed-accuracy line; the
+    0-facts sit above it (fast AND error-prone). This is zero-specific.
+
+#44 ERROR TAXONOMY ON THE 1-FACTS -- "COPIES THE OTHER OPERAND"
+    Both rules return one of the operands (n×0 -> 0, n×1 -> n). The 0-fact error "= n" returns the wrong one;
+    its mirror on the 1-facts is "= 1". Classes on the 1-facts, priority order: "= 1 (other operand)",
+    "= n+1 (additive)", "= 0 (zero rule)", "Other". On a 0-fact "= n" is at the same time the additive, the
+    copy and the 1-rule answer and cannot be split; on a 1-fact the three are different answers.
+    RESULT (ES_2025, ages 9-15, 0x1/1x0 apart): copying the other operand is 8.5% of ALL 0-fact responses
+    (79% of answered errors) vs 1.4% of 1-fact responses (29%). The purely additive answer n+1 is 0.8% of
+    1-fact responses (17% of errors). Cross-rule intrusions are small and symmetric: "= 1" on 0-facts 4.6%
+    of errors, "= 0" on 1-facts 5.6%. 0x1 / 1x0 errors are answered 1 in 87% of cases.
+    Reading: the dominant 0-fact error is not a generic additive slip (that is rare on the 1-facts) and not a
+    generic operand-copy (5-6x rarer on the 1-facts). It is specific to the zero.
+
+#45 MULTIPLICATION SIGNS (reviewer question 1) -- queries/check_operation_glyphs.sql
+    A998 operations, all years and countries, contain only the patterns d×d, d·d (multiplication) and
+    d:d, dd:d, d÷d, dd÷d (division). No 'x', 'X', '*' or other sign exists in A998, so the filter of #3 drops
+    no multiplication. The multiple signs and mis-classified operation types are a feature of the other
+    (Fluency-zone) dataset, which this study does not use (#1).
+
+#46 HELP AND MIS-RECORDED ANSWERS (reviewer questions 2 and 3) -- queries/check_user_answer_quality.sql
+    Help: 22,215 of 4.68M kept responses (0.47%) in ES_2025, almost all on retrieval facts (0-facts 173,
+    1-facts 280). 98.9% of Help rows have NO answer recorded and their median RT is 35-40 s, so they are not
+    hidden correct answers. They count as errors in error rates (#8) and are excluded from every answer
+    classification (#16). Excluding them moves 0- and 1-fact error rates by <= 0.04 points at any age and the
+    accuracy order model of #47 not at all (second:one +2.15 vs +2.14 points).
+    Mis-recorded answers: repeated-digit strings ('4444', '555') are 55 responses in total (0-facts 2, 1-facts
+    4) -- not filtered, they are errors either way. A different artefact was found: 30,621 CORRECT responses
+    (0.8% of correct, all on retrieval facts with a two-digit product) store the answer with its digits
+    REVERSED ('82' for 7x4); statement_result is right, the stored string is not. 8,104 INCORRECT responses
+    have the same reversed pattern and may be the same artefact graded as wrong. This cannot touch the 0- or
+    1-facts (single-digit products) and no analysis of the study classifies retrieval answers, so nothing is
+    excluded. To be reported to the product team.
+
+#47 DATA-COLLECTION WAVES (reviewer question 4) -- queries/rt_error_by_fact_age_wave.sql
+    Wave from fluency_test_metrics.response_at: T1 Sep-Jan, T2 Feb-Apr, T3 May-Aug. ES_2025: Nov-Dec 2025,
+    Mar 2026, May-Jun 2026 (most students sit 2-3 tests: 30,773 one, 55,387 two, 85,833 three). ES_2024:
+    Dec 2024 and May-Jun 2025 only, and ages 12-15 only in T3.
+    THE ITEM SET CHANGES WITH THE WAVE: at age 9 the 0-facts and n×1 appear only in T3; at age 8 T1/T2/T3
+    carry 18/36/72 facts. So pooled "age 9" for the 0-facts is "end of age 9", and any within-student order
+    contrast on the 1-table at age 9 compares 1xn (all year) with n×1 (T3 only) -- that is why it reads +200 ms.
+    Every 0 vs 1 model below therefore uses ages 10-15. Split by wave, the 0 > 1 error gap holds in every
+    age x wave cell from age 9 T3 to age 15 T3.
+
+#48 RESULT -- ORDER EFFECT, 0 vs 1 IN ONE TRIAL MODEL (order_effect_fe_zero_one_by_age_ES_2025.png)
+    feols, student + pair fixed effects (pair = table + non-rule operand), SE clustered by student, ages
+    10-15, age centred at 12. Query for the 1-facts: queries/rt_one_facts_trials.sql.
+      log RT    second +.017 (0-table), second:one -.012, second:one:age -.0034/yr   (ES_2025)
+                second +.026,           second:one -.023, second:one:age -.017/yr    (ES_2024)
+      accuracy  second -2.3 pp (0-table), second:one +2.1 pp                          (ES_2025)
+                second -2.9 pp,           second:one +2.6 pp                          (ES_2024)
+    By age: the 0-table order effect is +29 to +44 ms at every age 10-15; the 1-table one is +33 / +30 ms at
+    10-11 and ~0 from 12 on (-14 to +13 ms, all CIs include 0). Accuracy: the 0-table order cost is -1.3 to
+    -3.6 points at ages 10-15; on the 1-table it is ~0 (-0.1 to +0.5).
+    THIS REVISES #24: pooled over ages the two rule tables looked alike because ages 9-11 dominate the
+    sample. The RT asymmetry is shared with the 1-table only while the 1-table is young; from age 12 it is
+    zero-specific, and the accuracy asymmetry (#33) is zero-specific at every age. Same picture with the
+    per-student Wilcoxon of #19 (0 vs 1 inside the same students: +42/+47/+18 ms at ages 12/13/14, Holm
+    p < .05 in ES_2025; same sign, ns, in the smaller ES_2024 sample).
+
+#49 RESULT -- SEQUENTIAL CONSISTENCY BY AGE (seq_consistency_zero_one_by_age_ES_2025.png)
+    First two kept trials per student x age x type, as #35. Tetrachoric r: ×0 .65-.79 at every age 9-15;
+    ×1 .29-.45 at ages 10-15, i.e. at the retrieval level (.28-.44). ×1 is higher only at ages 8-9 (.63/.55),
+    where almost every ×1 pair is 1xn followed by 1xn (same order). Note the pooled ×1 value here (.61) is
+    higher than the .42 of #41 because this sample keeps ages 8-9 and every student with two ×1 trials, not
+    only the 81,390 with all three types.
+    Transfer: switching the order costs ×1 much more than ×0 (×1 .64 same order vs .41 switched, ×0 .75 vs .68).
+    Robustness pending in #36: ×0 without 0x1 / 1x0 gives r .72 (vs .71), every age within .01-.06.
