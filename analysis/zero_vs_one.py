@@ -692,3 +692,37 @@ assert tr.second.isin([0, 1]).all() and set(tr.n) <= set(range(1, 10))
 assert not tr[tr.one.eq(1)].n.eq(1).any()                                            # 1×1 never pulled
 assert (pairs["zero"].student_uuid.value_counts().max() <= 8)                        # one pair per student x age
 print("all checks passed")
+
+
+# %% [markdown]
+# ## 9. Conclusions
+#
+# **Design.** Every main inspection of the 0-facts repeated with the 1-facts (also rule-solved) as their own group:
+# a pattern present for 0 and absent for 1 is not explained by rule use alone. ES_2025, replicated in ES_2024.
+#
+# | Pattern | 0-facts | 1-facts | Zero-specific? |
+# |---|---|---|---|
+# | Speed (median RT, ages 9–15) | 2.06 s | 2.22 s (retrieval 3.76 s) | No — both rule-fast |
+# | Error rate (ages 9–15) | 10.4% (2024: 14.6%) | 4.7% (2024: 7.3%) | **Yes**, ×2 at every age and wave |
+# | Copying the other operand | 8.2% of responses, 78% of errors | 1.4% of responses, 29% of errors | **Yes**, ≈ 6× |
+# | RT order cost (FE, ages 10–15) | +1.7% log RT, flat with age (ES_2025) | ≈ +0.5%, gone from age 12 | Partly: only 0 after age 11 |
+# | Accuracy order cost (FE, ages 10–15) | −2.3 pp (−1.3 to −3.6 per age) | ≈ −0.2 pp | **Yes** (replicates in ES_2024) |
+# | Sequential consistency (tetrachoric) | .71, stable .65–.79 across ages | .61, falls .63 → .29–.45 | **Yes**, increasingly with age |
+#
+# 1. **Same speed, double the errors.** 0- and 1-facts are equally fast, but the 0-facts are about twice as error-prone
+#    at every age (Holm p ≤ .001 except ES_2024 age 15) and in every collection wave, so the gap is not a timing artefact.
+# 2. **The 0-error is a rule confusion.** Returning the other operand dominates on 0-facts; on 1-facts errors are
+#    spread (additive `n+1` 17%, applying the zero rule 6%). On `0×1` / `1×0`, 87% of errors are `1`.
+# 3. **Order: RT shared early, accuracy zero-only.** The 1-table shows an RT order cost at ages 10–11 that disappears
+#    from 12; the 0-table keeps it (within-student 0 − 1 difference +18 to +47 ms at 12–14). In accuracy only `n×0` is
+#    penalised. Robust to dropping `Help`; ES_2024 replicates both interactions.
+# 4. **Consistency is zero-specific and persistent.** ×0 trials stay tightly coupled at every age (also without
+#    `0×1` / `1×0`, .72, and across operand + order change, .68), whereas ×1 and retrieval become less coupled with age.
+# 5. **Data checks are clean.** Only `×` / `·` glyphs exist; `Help` is 0.47% of responses and moves rule-fact error
+#    rates by < 0.1 pp.
+#
+# **What it suggests.** Rule use explains why 0-facts are fast and part of the early order cost, but not the rest:
+# the higher error rate, the operand-copy error, the accuracy cost of `n×0` and the all-or-nothing consistency are
+# specific to zero. The ×1 rule becomes automatic with age; the zero rule stays a conceptual item that a student either
+# has or lacks. This supports framing the paper around a zero-specific rule representation, with the 1-facts as the
+# control that rules out generic rule use. Age-9 contrasts are confounded with the wave (0-facts and `n×1` only in T3).

@@ -24,6 +24,7 @@ Zero/
     ├── rt_order_robustness.ipynb
     ├── sequential_zero_consistency.ipynb
     ├── zero_vs_one.ipynb
+    ├── cognitive_predictors.ipynb
     └── plots/                # figures generades (PDF + PNG)
 ```
 
@@ -144,3 +145,37 @@ Canviar la query genera un cache nou automàticament; `refresh=True` força torn
   només ho és a partir dels 12 anys; la consistència seqüencial també és específica del 0. Decisions #42-#49.
   Queries noves: `rt_one_facts_trials.sql`, `rt_error_by_fact_age_wave.sql`, `check_operation_glyphs.sql`,
   `check_user_answer_quality.sql`. Font: `zero_vs_one.py` (cel·les `# %%`).
+
+- **`analysis/cognitive_predictors.ipynb`** — estudi longitudinal: els factors cognitius de **COSMOS 2023-24**
+  (6 i 7 anys, PRE i POST) prediuen l'ús de la **regla del 0** (i de l'1) a l'A998 un o dos anys després,
+  per sobre dels fets de recuperació? COSMOS 2023-24 es reconstrueix en format gold (percentils contra la
+  norma 2024-25) i queda a la cache. La regla del 0 només es pot estudiar a la cohort de 7 anys als 9 anys
+  (a 8 anys l'A998 no té fets amb 0).
+  Resultat: el **raonament (matrius)** prediu la precisió amb el 0 controlant la recuperació (OR 1,35 per DE,
+  PRE), la **memòria de treball** en la mateixa direcció i mida (1,28-1,38, no significativa després de Holm);
+  cap factor prediu la regla de l'1. Efecte concentrat a Mèxic. Decisions #50-#56.
+  Afegit (octubre 2026): **predictor combinat PRE+POST** (mateixa estimació, sense guany de potència), **biaix de selecció**
+  (pesos IPW amb IC per bootstrap de classes i efectes fixos de classe: l'efecte no s'explica per la selecció), test formal
+  **Mèxic vs resta** (no significatiu) i **contrast amb la cohort gran COSMOS 2024-25** a 8 anys: la regla de l'1 és un nul
+  precís (OR 0,99-1,04, equivalent a negligible, ~21.800 alumnes) mentre la recuperació hi respon fort. Decisions #59-#62.
+  Queries: `queries/cosmos_2324_gold.sql`, `queries/cosmos_gold_by_year.sql`, `queries/a998_cosmos_2324_trials.sql`,
+  `queries/a998_cosmos_student_counts.sql`. Font: `cognitive_predictors.py`.
+
+- **`analysis/zero_rule_correlates.ipynb`** — amb què va lligada la regla del 0 fora de l'A998? **ConMAT** del mateix
+  curs (subescales de contingut i de procés), el test **socioemocional** (exploratori) i **COSMOS** al mateix model.
+  Descobriment a ES_2024, confirmació a alumnes nous d'ES_2025.
+  Resultat: la ConMAT total prediu la regla del 0 per sobre de la fluïdesa i la velocitat (β latent 0,11-0,13, Kraft mitjà,
+  replicat) i gairebé no la de l'1; per sobre de la resta de la prova hi afegeixen poc totes les àrees (β 0,03-0,05),
+  sobretot el **contingut conceptual**. WM i matrius comparteixen bona part del senyal amb la ConMAT. Decisions #71-#76.
+  Queries: `zero_rule_student_outcomes.sql`, `conmat_student_subscores.sql`, `socioemotional_scores.sql`.
+
+- **`analysis/n_error_hypotheses.ipynb`** — d'on surt la resposta `0×n = n` (revisió de l'expert, novembre 2026).
+  **H1 suma**: els alumnes que responen `n` no sumen més en altres multiplicacions un cop condicionat a l'error
+  (`n+1` a les taules de l'1: 18,8% vs 18,5% dels errors; `a+b`: 3,1% vs 2,8%, ns). **H2 interferència de l'×1**: un
+  fet amb 1 just abans puja el `= n` +0,5 pp sobre 8,5% (dins d'alumne i de test), només aquest error, no és
+  perseveració, ni ho explica el nivell o la velocitat de l'alumne (#67); contribució petita. **H3 RT** (sense filtre de RT, perquè el signe en depenia): dins d'alumne `= n` és
+  un 8% més ràpid que l'encert, només a 9-11 anys, i un 61% més lent que els altres errors (endevinalles, ~0,8 s). **H4 còpia de l'operand**: no; amb un error a un fet ×1, els alumnes `n` responen 1 *menys*
+  (27% vs 35%), i el `= 1` sembla una intrusió de la regla del 0 en qui la té. **H5 creença o lapsus**: un 1,9% dels
+  alumnes amb >= 4 fets amb 0 responen `n` gairebé sempre (86%) i fan el 19% de les respostes `n`; la resta és
+  intermitent. Decisions #63-#69.
+  Queries: `queries/n_error_zero_trials.sql`, `queries/n_error_student_facts.sql`. Font: `n_error_hypotheses.py`.

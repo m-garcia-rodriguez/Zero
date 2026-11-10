@@ -626,3 +626,304 @@ Notebook: analysis/zero_vs_one.ipynb (source kept as analysis/zero_vs_one.py, "#
     only the 81,390 with all three types.
     Transfer: switching the order costs ×1 much more than ×0 (×1 .64 same order vs .41 switched, ×0 .75 vs .68).
     Robustness pending in #36: ×0 without 0x1 / 1x0 gives r .72 (vs .71), every age within .01-.06.
+
+--------------------------------------------------------------------------
+2026-10-13  Decisions #50-#56 (seventh notebook: COSMOS cognitive predictors of rule use)
+--------------------------------------------------------------------------
+Notebook: analysis/cognitive_predictors.ipynb (source kept as analysis/cognitive_predictors.py, "# %%" cells).
+
+#50 LONGITUDINAL LINK: COSMOS 2023-24 -> A998 2024-25 / 2025-26
+    COSMOS 2023-24 is the only round old enough to reach the A998 0-facts (rounds PRE/POST 6y and 7y, test
+    E13D532F...; 1,517 students, 68% MX, 18% ES, 13% US -- PRE 7y had no Spanish classrooms). Nothing older
+    exists in Databricks (checked silver, gold and every bronze table carrying a test uuid).
+    Linked on student_uuid (same format in both sources) to every kept A998 multiplication response in
+    *_2024 and *_2025, ANY country (not ES only, unlike #2): queries/a998_cosmos_2324_trials.sql.
+    Filters #3, #4, #7, #8 apply. 1,286 students linked.
+    Windows by A998 course age: 6y -> age 8 (2025-26), 7y -> age 8 (2024-25), 7y -> age 9 (2025-26 and a few
+    MX classrooms already at 9 in 2024-25). AT AGE 8 A998 HAS NO 0-FACTS AND ONLY 1xn (#12, #42), so the zero
+    rule is studied ONLY in 7y -> age 9 (375 students with >= 1 0-fact trial, median 2; end-of-year wave, #47).
+
+#51 COSMOS 2023-24 RAW SCORES
+    Rebuilt from processed_cosmos_reports.student_statement_score. The 2024-25 pipeline raw scores were
+    reproduced exactly: WM = 100*score; magnitude comparison, number line, processing speed, reasoning =
+    correct - ec*incorrect; arithmetic fluency, execution speed, number knowledge = that / seconds.
+    2023-24 stored NO response time for the three speeded tasks (0 in PRE, NULL in POST, Time = 0 in the
+    bronze payload), so every factor uses the net score correct - ec*incorrect. The speeded tasks are time-
+    limited, and in 2024-25 the net score ranks students like the rate (Spearman .96-.98 in all 4 rounds).
+    "reasoning" is taken to be the matrices (Raven-type) task: 24 multiple-choice items, ec .25.
+
+#52 GOLD FORMAT AND NORM
+    queries/cosmos_2324_gold.sql -> one row per student, {factor}_{pre|post}_{raw_score|percentile|
+    score_group|n_items}, column names as bi_gold_prod.dwh_assessment.f_cosmos_student_results (numerical_line
+    -> numeric_line). Percentile = mid-rank in the 2024-25 round of the same phase and course age (~26-31k
+    students, same test and activities); 2023-24 alone is too small to be its own norm. score_group with the
+    gold thresholds (< 30 low, >= 85 high). The composite numerical_abilities and error_percentage of the gold
+    table are NOT rebuilt (their weights are not in the warehouse). Cached through cached_query in cache/.
+    In the models a factor enters as the probit of its percentile (clipped .005-.995): 1 unit = 1 norm SD.
+
+#53 OUTCOMES AND "COMPARED TO NORMAL FACTS"
+    Fact types as #36/#42: 0-facts (0x0 excluded, 0x1/1x0 included), 1-facts (1x1 excluded), retrieval (2-9).
+    Primary model, per factor x phase: binomial GLM on the student's 0- (or 1-) fact correct/total ~ factor +
+    the student's own A998 retrieval accuracy (empirical logit, z within window; >= 5 retrieval trials) +
+    COSMOS country (levels < 15 students merged). The retrieval control is what makes the effect rule-specific.
+    SEs clustered by COSMOS classroom. Holm over the 16 factor x phase tests per outcome; the confirmatory
+    family is WM + reasoning, PRE + POST (4 tests) on the zero rule.
+    Robustness: trial-level factor x rule-fact interaction; 0 vs 1 in one trial model on the same students;
+    all-or-nothing rule use (>= 2 0-fact trials, #41); P(any "n x 0 = n" error) (#14).
+
+#54 RESULT
+    Zero rule, specific: reasoning PRE OR 1.35 [1.08, 1.68] (Holm-4 p = .035), POST 1.28 [0.99, 1.64];
+    WM PRE 1.38 [0.95, 1.99], POST 1.28 [1.00, 1.64] (Holm-4 p = .15). Raw (no retrieval control): reasoning
+    PRE 1.51, WM POST 1.40, reasoning POST 1.38 survive Holm-4. Nothing survives Holm over 16.
+    One rule (age 8 both cohorts, age 9): every OR 0.81-1.16, nothing survives Holm. Same students, 0 vs 1:
+    WM PRE predicts 0-facts more than 1-facts, ratio 1.89 [1.36, 2.63] (Holm-16 p = .003); reasoning 1.42.
+    WM vs reasoning (same students, specific model): alone each OR ~1.3; together both shrink similarly
+    (PRE 1.24 / 1.28, POST 1.19 / 1.20; rho .31-.38), only reasoning PRE p < .05. They share most of the
+    signal and the data cannot separate them. The 8-factor joint model (reasoning 1.48-1.56, WM 1.12-1.14) is
+    NOT interpreted: its split comes from suppressor factors that turn negative once retrieval is held.
+    Domain-specific factors (arithmetic fluency, number line, number knowledge, magnitude)
+    predict RETRIEVAL most (OR 1.2-1.7, Holm < .05) and go slightly negative for the zero rule once
+    retrieval is held (suppression, none Holm-significant).
+    Reading: the hypothesis is supported for the zero rule (a shared WM + reasoning signal; reasoning PRE the only test surviving Holm-4),
+    the "both rules" version is not.
+
+    EFFECT SIZE: OR per SD of a continuous predictor has no field convention. Cohen's r .1/.3/.5 are
+    translated through the latent logistic model, r = ln(OR)/sqrt(ln(OR)^2 + pi^2/3), giving small/medium/
+    large OR = 1.20 / 1.77 / 2.85 (inverses 0.83 / 0.56 / 0.35); background bands in the forest plot. The
+    WM/reasoning zero-rule effects (OR 1.28-1.38, latent r .13-.17) are SMALL.
+
+#55 LIMITS
+    Carried by Mexico: MX alone WM/reasoning 1.39-1.50 (all p < .05); ES + US (POST only, 182 students, 22
+    classrooms) 1.00-1.07. Subsets with < 10 classrooms are not reported (cluster SEs unreliable).
+    Minimum detectable OR at 80% power ~1.5 per SD for the zero rule; 2 0-fact trials per student; 375 of 844
+    7-year-olds reach a 0-fact trial (selection). Observational.
+
+#57 MINIMUM DETECTABLE EFFECT, 90% POWER (forest plot reference)
+    MDE = exp((z.975 + z.90) * SE) = exp(3.24 * SE), alpha .05 two-sided, SE = median over the 8 factors of
+    each outcome x phase (PRE and POST are different samples). Drawn as panel-coloured lines (PRE dashed,
+    POST dotted) at MDE and 1/MDE, and printed in each panel title.
+      0-rule age 9 (specific)    PRE 1.93 (174 students)   POST 1.53 (357)
+      1-rule age 9 (specific)    PRE 1.37 (310)            POST 1.29 (608)
+      1-rule age 8, 7y cohort    PRE 1.24 (319)            POST 1.19 (662)
+      1-rule age 8, 6y cohort    PRE 1.39 (346)            POST 1.34 (438)
+      Retrieval age 9            PRE 1.27 (344)            POST 1.23 (667)
+    The zero-rule design only detects medium effects; the observed 1.28-1.38 are below it.
+
+#58 THE 1.2 s FILTER AS A SENSITIVITY ANALYSIS
+    queries/a998_cosmos_2324_trials.sql no longer applies #7; it returns every response with a fast_wrong flag
+    and the notebook applies the filter (main analysis unchanged) or not (section 8b).
+    In this cohort 37.7% of responses are fast-wrong (MX 35-39% at age 9, ES 15-18%, US ~10%), far above the
+    main study. Without the filter: 0-rule students 375 -> 395 (PRE 174 -> 186, POST 357 -> 381), trials +38%,
+    MDE90 1.93 -> 1.69 (PRE), 1.53 -> 1.49 (POST); retrieval MDE gets worse (1.27 -> 1.36).
+    0-rule specific, no filter: reasoning PRE 1.56 [1.20, 2.02], POST 1.49 [1.16, 1.91], both Holm-16 < .05;
+    WM PRE 1.27 ns, POST 1.32 (p = .025, Holm-16 ns). One rule null.
+    Fast-wrong 0-fact answers: median 0.80 s, 11% = "n". Neither factor predicts the overall fast-wrong rate
+    (OR 0.83-0.99, ns) and the reasoning effect is unchanged with that rate held -> not an engagement artefact;
+    plausibly rule failures answered by guessing. Main analysis keeps #7; this one is reported as sensitivity.
+
+#56 NEXT
+    Replicate with COSMOS 2024-25 (~28k 7-year-olds) when they reach age 9 in A998 (2026-27 end-of-year wave).
+    Add RT and the order effect (#33) as outcomes. Model MX vs ES explicitly.
+
+--------------------------------------------------------------------------
+2026-10-21  Decisions #59-#62 (cognitive_predictors.ipynb: combined predictor, selection, large-cohort contrast)
+--------------------------------------------------------------------------
+
+#59 COMBINED PRE+POST PREDICTOR
+    z_comb = (z_pre + z_post) / sqrt(2(1 + r)) when a student has both rounds, else the round available; r = PRE-POST
+    Pearson correlation of the probit scores in the 2024-25 norm, same factor and course age (WM .44, reasoning .59 at 7y).
+    Both branches then have unit variance in the norm, so 1 unit = 1 norm SD as in #52. Models add PRE-only / POST-only
+    dummies (pattern differs by country). Holm over 8 factors per outcome; confirmatory WM + reasoning, Holm over 2.
+    queries/cosmos_gold_by_year.sql generalises cosmos_2324_gold.sql with the marker -- {COSMOS_YEAR}; with '23-24' it
+    returns exactly the cached 2023-24 table (assert in the notebook). The old file is kept for the cache only.
+    Result: WM 1.29 [1.00, 1.67], reasoning 1.26 [1.00, 1.58], Holm-2 .095; SE = POST-only SE (ratio 1.02): only 168
+    analysed students have both rounds. Raw: 1.38 / 1.42, Holm-2 .007 / .004.
+
+#60 SELECTION INTO THE ZERO-RULE SAMPLE
+    Funnel: 844 7y -> 488 A998 at age 9 T3 -> 375 with a 0-fact -> 365 with >= 5 retrieval (analysed).
+    Given T3, drawing a 0-fact is explained by test length (OR 2.6 per log trial), not by WM / reasoning (p .71 / .25):
+    with random item draws this step is missing at random given test length.
+    IPW: logit P(analysed) on the whole 7y cohort ~ 8 combined factors (missing set to 0 + flag) + country + pattern;
+    stabilised, truncated 1-99%; AUC .66, ESS 330 / 365, every |SMD| < .10 after weighting. statsmodels cluster SEs are
+    not valid with var_weights, so IPW CIs come from 500 COSMOS-classroom bootstraps that re-fit the weights.
+    Within-classroom estimate: COSMOS classroom fixed effects (classrooms >= 2 students; pattern dummies dropped when
+    constant within classroom). Results: IPW 5-7% lower (specific 1.20-1.29, CIs include 1); classroom FE higher
+    (reasoning 1.40-1.59, p < .05). Figure cognitive_predictors_selection_balance.
+
+#61 LARGE-COHORT CONTRAST: ONE RULE AT AGE 8, COSMOS 2024-25
+    queries/a998_cosmos_student_counts.sql: A998 aggregated per student x year x age x wave for one COSMOS round year
+    (markers -- {COSMOS_YEAR} '24-25', -- {YEARS} 2025). 7y 2024-25 at age 8 in 2025-26: 23,496 students, 21,809 with 1xn
+    (median 3 trials). Same specific model, TOST equivalence with bounds 0.83-1.20 (the small-effect OR, #54).
+    Result: 1-rule OR 0.99-1.04 for all 8 factors, all equivalent to negligible, MDE 1.05; retrieval positive control
+    1.11-2.08, all Holm < .05. Contrast, not replication (different cohort and age). Figure cognitive_predictors_forest_comb_contrast.
+
+#62 MEXICO VS REST, FORMAL TEST
+    factor x Mexico interaction in the specific zero-rule model; blanked when < 10 classrooms outside Mexico (#55): PRE
+    is not testable (4 US classrooms). POST / combined ratios 1.32-1.44, all ns (Holm .59): the MX concentration in #55
+    is a difference in precision, not a demonstrated difference in effect.
+
+
+--------------------------------------------------------------------------
+2026-11-09  Decisions #63-#66 (n_error_hypotheses.ipynb: where the "= n" answer comes from -- expert review)
+--------------------------------------------------------------------------
+
+#63 TARGETS, GROUPS AND CONTEXT
+    Target 0-facts: exactly one operand 0 and n >= 2. 0x0 has no additive error (#15); on 0x1 / 1x0 the answer 1 is
+    the additive, the copy and the 1-rule answer at once (#44). Ages 9-15 (no 0-facts at 8, #12). Unit = student x age.
+    H1 groups (target 0-facts, #7 applied): n-error (>= 1 "= n"), other 0-error (errors, never "= n"), 0-correct.
+    Robustness: "consistent" = "= n" on >= 50% of 0-trials vs all correct.
+    H1 outcome only on facts outside the group definition: 1-facts (additive = n+1) and retrieval (additive = a+b,
+    2x2 excluded; "clean" subset drops pairs where a+b is a multiple of an operand, e.g. 2x4 -> 6 = 2x3).
+    H2 context: lags over ALL statements of the same test (metric_id) by statement_idx, divisions included;
+    0x0 counts as a 0-fact as context. Queries: n_error_zero_trials.sql (1.2 s rule NOT applied, fast_wrong flag),
+    n_error_student_facts.sql (#7 applied; error cells + per-ptype totals).
+
+#64 H1 IS CONDITIONAL ON AN ERROR
+    n-error students make more errors of every kind, so the raw additive rate per response is not evidence of adding.
+    Outcome = P(additive | answered error); weighted LPM on student x fact cells (weight = answered errors), FE fact x age,
+    deciles of the non-zero error rate, bins of the number of 0-trials; SEs clustered by student. Effect size: MH odds
+    ratio over fact x age strata -> d = ln(OR)*sqrt(3)/pi -> Kraft (2020) label. O/E vs pooled fact x age rate.
+    RESULT: per response n-error students add ~2x more (1.11 vs 0.59 per 100 1-fact responses), given an error the
+    same (1-facts 18.8 vs 18.5%, adj +1.5 pp [0.2, 2.8], p .02, d .02 small; retrieval 3.1 vs 2.8%, +0.04 pp, p .73;
+    clean pairs and reversed-digit answers (#46) unchanged). Addition is not a general strategy of these children.
+
+#65 H2 IS WITHIN STUDENT (AND WITHIN TEST)
+    LPM: "= n" ~ previous statement type (ref retrieval) + previous answer = n (perseveration) | unit + fact + position
+    decile; second spec with test FE. Balance of position, test length, age and n across previous types checked.
+    RESULT: previous 1-fact +0.53 pp [0.22, 0.85] on 8.5% (test FE +0.51); 1-fact within 3 previous +0.97 pp (d .07,
+    medium); only "= n" moves (other errors -0.17 ns); needs the 1-fact answered right; not perseveration (after a
+    1-fact whose answer is n: 7.7% vs 9.3%); previous 0-fact -0.75 pp. No single age Holm-significant. 8% of 0-trials
+    follow a 1-fact: small contribution.
+
+#66 H3 USES NO RT FILTER (revised 2026-11-09, same day)
+    The direction of "= n" vs correct depends on the 1.2 s filter: #7 (drops only WRONG answers < 1.2 s) +8.4%,
+    symmetric 1.2 s floor on every answer +6.0%, no filter -8.4% (12% of sub-1.2 s errors are "= n"). Because the
+    sign depends on the filter, H3 drops it: every answered response is kept; #7 and the symmetric floor stay as
+    sensitivities. H1 and H2 keep #7. Help (no answer) excluded. log RT | unit + fact, clustered by student;
+    d = b / SD(log RT, correct 0-fact answers).
+    RESULT: "= n" -8.4% vs correct [-9.3, -7.5] (d -.17, medium), only at ages 9-11 (-23%, -13%, -8%; 12-15 null);
+    paired median ratio 0.98 (48% of students slower). Other errors are guesses (median ~0.8 s); "= n" +61% vs them.
+    Raw medians show "= n" SLOWER than correct: students who give "= n" are slower overall, so only the within-student
+    contrast answers the question. Robust across filters: "= n" sits near correct-answer speed, far from the guesses.
+
+#67 H2 CONTROLLED FOR STUDENT SPEED AND LEVEL
+    Controls from queries/student_controls.sql (#31), retrieval facts only (2-9 x 2-9, never a 0- or 1-fact):
+    level = acc_nr, speed = mean_lnrt_nr (higher = slower), z-scored within course age; n_nr >= 10. Coverage 69% of
+    responses (60,974 units): #31 requires >= 20 non-zero responses, which short tests do not reach.
+    The unit FE already absorbs stable student traits, so the controls are used (a) in the model WITHOUT unit FE,
+    (b) as moderators inside the unit FE (p_one x level, p_one x speed), (c) unit-FE estimate per quintile.
+    RESULT: p_one +0.39 pp (unit FE, same sample), +0.49 (no student terms), +0.42 (+ level + speed). Level -2.8 pp per
+    SD, speed +1.1 pp per SD slower on "= n"; interactions +0.10 / -0.19, ns; no gradient across quintiles.
+
+--------------------------------------------------------------------------
+2026-11-09  Decisions #68-#69 (n_error_hypotheses.ipynb: copy account and misconception vs slip)
+--------------------------------------------------------------------------
+
+#68 H4 -- COPY THE OTHER OPERAND
+    n_error_student_facts.sql gains n_copy = WRONG answer equal to one of the operands (1-facts n >= 2: the answer 1,
+    mirror of "= n" on 0-facts, #44; retrieval: operand intrusion). Same groups, cells and adjustment as H1 (#64).
+    RESULT: given a 1-fact error, n-error children answer 1 LESS (27.1 vs 34.8%; adj -3.4 pp [-4.9, -1.8], MH OR 0.69,
+    d -.20 large; mainly ages 10-11); r_tet with "any copy" -.07 (addition +.06). Retrieval operand copy +0.7 pp
+    (OR 1.11, d .06 medium). 1-fact error rate +0.8 pp given retrieval level (not relatively accurate on 1-facts).
+    Not a general copy habit; "= 1" on 1-facts reads as a zero-rule intrusion by children who have the zero rule.
+
+#69 H5 -- MISCONCEPTION VS SLIP
+    Children with >= 4 target 0-trials (#7), k "= n" of m. Binomial mixtures K = 1-4 by EM (6 starts), BIC; posterior
+    predictive check of the share distribution; same mixture on other errors as control. Stability: n share in two
+    tests (>= 2 target trials each, test order not used).
+    RESULT (52,833 children, median 6 trials): one rate fails (predicts 0.0% always-n, observed 1.0%); K = 4:
+    61.8% at 0.6%, 28.7% at 8.1%, 7.6% at 39%, 1.9% at 86%. The systematic class (1.7% by posterior) gives 19% of all
+    "= n" (49.5% at age 9, 10.5% at 15). Other errors: top class 0.3% at 70%. Two tests: Spearman .25; ">= half" in
+    one -> ">= half" in another 31% (5% after none). A stable belief for a few, intermittent for most.
+
+--------------------------------------------------------------------------
+2026-11-09  Decision #70 (sequential_zero_consistency.ipynb, section 15b: discrete types against a continuum)
+--------------------------------------------------------------------------
+
+#70 LATENT CLASSES AGAINST A CONTINUOUS (IRT) MODEL
+    Question: do students fall into a few types (have the rule / hold the misconception / inconsistent) or
+    spread along one continuous skill? The tetrachoric of .70 cannot tell (a steep continuous ability gives
+    the same number); a model comparison can.
+    Data: queries/sequential_trials_answers.sql = sequential_trials.sql + user_answer (try_cast, #14). Unit =
+    student x age. Answer TYPES, not right/wrong:
+      x0         correct | = n (other operand) | = 1 | other            (#14)
+      x1         correct | = 1 (other operand) | = n+1 | other          (#44)
+      retrieval  correct | = a+b | table neighbour (a±1)·b, a·(b±1) | other   (a+b checked first)
+    Help / no answer = other. 0x0 out (#15); 0x1 and 1x0 out (= n, = 1 and the rule coincide, #44).
+    Models (latent_models.py, marginal ML, analytic gradient, L-BFGS): latent classes K = 1-4 with age-specific
+    class shares; nominal-response IRT with one ability, normal within each age (age 11 = N(0,1)), 15-node
+    Gauss-Hermite. BOTH get the same operand + order terms (retrieval: fact terms), shared across classes /
+    ability, so neither wins on item structure. LCA: 5 random starts, best log-likelihood kept.
+    Sample: every student x age with >= 2 x0 trials. The class probabilities are shared, so the model is
+    identified by the students with more trials; a >= 3 cut would keep 21% of the 9-year-olds, who are weaker
+    (x0 accuracy .82 vs .89) and where the misconception is most common. >= 3 and >= 5 are sensitivity fits.
+    Controls: x1 and retrieval on the SAME student x age units with the SAME number of trials as their x0
+    trials, drawn at random (retrieval runs to the cap of 14; more trials per unit would favour classes).
+    Evidence: BIC, held-out log score (one trial per unit with >= 3 trials, all models refitted), relative
+    entropy and AvePP, posterior-predictive checks (repeated = n; same error type on two consecutive errors),
+    class shares by age, modal class ~ age + level_z (MNLogit; modal assignment attenuates), order within class.
+    Local independence is CHECKED, not assumed: observed minus predicted agreement of consecutive answers by
+    distance (0-2 items, 3-10, >10, another test). A latent transition model across tests is the follow-up.
+    Complements #69 (binomial mixture of the "= n" share alone, n_error_hypotheses.ipynb): #70 codes every answer
+    type and compares the classes with a continuous model and with the x1 / retrieval controls.
+    RESULT (ES_2025; x1 / retrieval on the same 78-89k units, same trial counts). BIC best K - IRT per 1000 units:
+    x0 -43.1 (3 classes -17.0), x1 -2.9, retrieval -3.7; held-out gain vs IRT (log score x1000): 7.3, 0.7, 0.9;
+    entropy .77, .58, .54. Same error type on two consecutive errors, observed / classes / IRT: x0 85 / 81 / 69%,
+    x1 61 / 54 / 47%, retrieval 79 / 79 / 78% (85% of retrieval errors are "other"). x0 classes: rule 78% (97% correct),
+    mixed 14% (71% correct, 28% = n), other errors 4%, '= n' 4% (81% = n; 12% at age 9 -> 1% at 15; RRR .49 per SD
+    level_z). Robust to >= 3 and >= 5 trials. Excess agreement of consecutive answers: +3.8 pp (0-2 items), +3.4 (3-10),
+    +0.9 (>10), -2.1 (another test). Reading: zero-specific discrete structure, but a graded middle and some carry-over.
+    Stability (35,310 students with >= 2 x0 trials in each of two tests, median 101 days apart, each test classified on
+    its own; benchmark = simulated perfectly stable classes): rule keeps 92% (benchmark 92%); '= n' keeps 27% (52%),
+    47% of it is 'rule' at the second test; rule -> '= n' 1.4%. Consistent within a test, mostly left behind in months.
+    Not done: the mixture of the two (continuous variation inside classes).
+
+--------------------------------------------------------------------------
+2026-11-10  Decisions #71-#76 (notebook zero_rule_correlates -- what the zero rule goes with outside A998)
+--------------------------------------------------------------------------
+Notebook: analysis/zero_rule_correlates.ipynb. Queries: zero_rule_student_outcomes.sql, conmat_student_subscores.sql,
+socioemotional_scores.sql (+ the cached COSMOS queries of #50-#59).
+
+#71 OUTCOME, CONTROLS, CLUSTERS
+    One row per student x year: 0-fact k/n (0x0 out, 0x1 in, #36), 1-facts as the specificity outcome, controls on the
+    retrieval facts only (accuracy as empirical logit, speed = -mean ln RT of correct; both z within course age; >= 5
+    retrieval trials). Binomial GLM + course-age dummies. SEs clustered by SCHOOL: A998 ES_2024 has classroom_uuid NULL
+    in 100% of metrics, so #35's classroom clustering is not available; school is used in both years.
+
+#72 CONMAT SCORES
+    lean_processed_conmat_reports, BUBBLE_TREE tags: 5 content blocks (primary and secondary codes merged) and 6
+    cognitive domains; last answer per item, completed tests. Score = empirical logit of the tag's items, z within test
+    (age x phase x version), mean over PRE/POST, phase-pattern dummies. "Rest" = the same on all other items.
+    Item "Identify the properties of multiplication" (reports_conmat_contents_0007) may contain n x 0: removed from every
+    score; no other item text could be checked.
+    M1 = indicator + controls; M2 = M1 + rest score (what a subscore adds beyond general curricular maths).
+
+#73 DISCOVER / CONFIRM
+    Discovery ES_2024 (63,886 students, 1,027 schools). Hit = Holm < .05 over the 11 subscores in M2 on 0-facts.
+    Confirmation: ES_2025 students NOT in the ES_2024 sample (44,090, 845 schools), Holm over the hits, same sign.
+    The criterion was set on ES_2024 alone; the ES_2025 run did not change any choice.
+    Effect size: latent beta = ln(OR) sqrt(3)/pi per SD (residual latent SD), Kraft (2020) labels.
+
+#74 RESULT, CONMAT
+    ConMAT total, M1: beta .108 (2024), .130 (2025 indep.), Kraft medium; 1-facts .025 / .031.
+    M2: 9 hits in 2024, 8 replicated (all but Connections), beta .026-.053; 1-facts within +-.03.
+    Joint models: conceptual content the most consistent domain (.047 / .046); no content block dominates.
+    Reading: tied to general, mostly conceptual curricular maths, not to fluency or test-taking.
+
+#75 RESULT, COSMOS IN THIS MODEL
+    7y -> age 9, 363 students, 50 classrooms (speed control added to #53): WM beta .142, matrices .129 (Holm-7 .24).
+    ConMAT total on the same students .165. With ConMAT held WM loses ~20% of its log-OR, matrices ~25%; with both held
+    ConMAT loses ~50%. Shared signal, not separable at n = 363. ConMAT r = .49 with matrices, .26 with WM. Scope: the
+    363 COSMOS students only (mostly MX); untested in the ES samples of #74.
+
+#76 RESULT, SOCIO-EMOTIONAL (EXPLORATORY)
+    MAES, ES_2024 only, linked at or before the A998 year: 1,032 students, 26 schools. Only self-concept survives Holm-8
+    (beta -.131; -.103 with ConMAT held; 1-facts null). Scores appear keyed higher = more negative (self-concept r -.45
+    with ConMAT, +.52 with test anxiety): to verify before reading the sign. The two stereotype subareas have no variance.
+
+#70 H2 SIZE OF EFFECT: REFERENCE = NO 1-FACT NEARBY
+    For the size-of-effect figure (n_error_h2_size_of_effect_ES_2025) the reference is a 0-fact with NO 1-fact in the
+    3 previous statements; exposure split into 1-fact just before / 1-fact 2-3 back; controls: 0-fact nearby,
+    persev; FE unit + fact + position decile. The #65 reference (retrieval just before) still contained 1-facts at
+    lag 2-3, which diluted the contrast. RESULT: 8.1% -> 9.3% just before (+1.18 pp [0.89, 1.47], +15%, d .08 medium),
+    8.9% at 2-3 back (+0.84 pp, +10%). Holm-significant at 10-12, null at 9. About 2.5% of all "= n" attributable.

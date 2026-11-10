@@ -1,0 +1,21 @@
+
+--------------------------------------------------------------------------
+2026-11-09  Decisions #68-#69 (n_error_hypotheses.ipynb: copy account and misconception vs slip)
+--------------------------------------------------------------------------
+
+#68 H4 -- COPY THE OTHER OPERAND
+    n_error_student_facts.sql gains n_copy = WRONG answer equal to one of the operands (1-facts n >= 2: the answer 1,
+    mirror of "= n" on 0-facts, #44; retrieval: operand intrusion). Same groups, cells and adjustment as H1 (#64).
+    RESULT: given a 1-fact error, n-error children answer 1 LESS (27.1 vs 34.8%; adj -3.4 pp [-4.9, -1.8], MH OR 0.69,
+    d -.20 large; mainly ages 10-11); r_tet with "any copy" -.07 (addition +.06). Retrieval operand copy +0.7 pp
+    (OR 1.11, d .06 medium). 1-fact error rate +0.8 pp given retrieval level (not relatively accurate on 1-facts).
+    Not a general copy habit; "= 1" on 1-facts reads as a zero-rule intrusion by children who have the zero rule.
+
+#69 H5 -- MISCONCEPTION VS SLIP
+    Children with >= 4 target 0-trials (#7), k "= n" of m. Binomial mixtures K = 1-4 by EM (6 starts), BIC; posterior
+    predictive check of the share distribution; same mixture on other errors as control. Stability: n share in two
+    tests (>= 2 target trials each, test order not used).
+    RESULT (52,833 children, median 6 trials): one rate fails (predicts 0.0% always-n, observed 1.0%); K = 4:
+    61.8% at 0.6%, 28.7% at 8.1%, 7.6% at 39%, 1.9% at 86%. The systematic class (1.7% by posterior) gives 19% of all
+    "= n" (49.5% at age 9, 10.5% at 15). Other errors: top class 0.3% at 70%. Two tests: Spearman .25; ">= half" in
+    one -> ">= half" in another 31% (5% after none). A stable belief for a few, intermittent for most.
